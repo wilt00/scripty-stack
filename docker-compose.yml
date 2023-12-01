@@ -1,0 +1,36 @@
+version: '3.1'
+
+services:
+
+  db:
+    image: wilt/scripty-db:0.0.2
+    restart: always
+    environment:
+      POSTGRES_USER: scripty
+      POSTGRES_PASSWORD: scripty
+
+  # Temporary container for database testing
+  adminer:
+    image: adminer
+    restart: always
+    ports:
+      - 8080:8080
+
+  stt:
+    image: wilt/scripty-stt-service:0.1.0-cuda
+    environment:
+      - MODEL_NAME=ggml-base.en.bin
+      - INSTANCE_COUNT=2
+
+  # cache:
+  #   image: redis:7.2.3-alpine
+  #   restart: always
+
+  # core:
+  #   image: wilt/scripty-core:0.0.1
+  #   ports:
+  #     - 42069:42069
+
+  # monitor:
+  #   image: grafana/loki:v2.8.6
+

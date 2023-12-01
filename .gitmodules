@@ -1,0 +1,6 @@
+[submodule "scripty"]
+	path = scripty
+	url = ./scripty
+[submodule "stt-service"]
+	path = stt-service
+	url = .\\stt-service
