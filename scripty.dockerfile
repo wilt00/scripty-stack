@@ -6,7 +6,6 @@ RUN pacman -S mold clang pkgconf cmake postgresql --noconfirm
 RUN curl --proto '=https' --tlsv1.2 -sSf https://sh.rustup.rs | sh -s -- -y --default-toolchain none
 ENV PATH="/root/.cargo/bin:${PATH}"
 RUN rustup toolchain install nightly --allow-downgrade --profile minimal && rustup default nightly
-# RUN cargo install sqlx-cli --no-default-features --features native-tls,postgres
 
 WORKDIR /scripty-build
 COPY ./scripty .

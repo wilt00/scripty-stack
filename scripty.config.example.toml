@@ -1,0 +1,17 @@
+# See scripty/config.example.toml for full example
+
+i18n_dir = "/i18n"
+bind_address = "0.0.0.0:42069"
+redis_url = "redis://redis:6379"
+stt_services = ["stt:7269"]
+
+[database]
+host = ["db", 5432]
+user = "scripty"
+password = "scripty"
+database = "scripty"
+
+[loki]
+url = "http://loki:3100/"
+labels = { job = "scripty_node1", env = "dev" }
+extra_fields = {}
