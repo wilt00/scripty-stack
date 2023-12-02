@@ -1,36 +1,57 @@
-version: '3.1'
+version: '3.4'
 
 services:
 
   db:
-    image: wilt/scripty-db:0.0.2
+    image: postgres:16.1
     restart: always
     environment:
       POSTGRES_USER: scripty
       POSTGRES_PASSWORD: scripty
 
-  # Temporary container for database testing
-  adminer:
-    image: adminer
-    restart: always
-    ports:
-      - 8080:8080
-
   stt:
-    image: wilt/scripty-stt-service:0.1.0-cuda
+    image: wilt/scripty-stt:0.1.0-cuda
     environment:
-      - MODEL_NAME=ggml-base.en.bin
+      - MODEL_NAME=ggml-medium.en.bin
       - INSTANCE_COUNT=2
+    deploy:
+      resources:
+        reservations:
+          devices:
+            - driver: nvidia
+              count: all
+              capabilities: [gpu]
+    volumes:
+      - D:\ai:/models
+    ports:
+      - 7269:7269
 
-  # cache:
-  #   image: redis:7.2.3-alpine
-  #   restart: always
+  cache:
+    image: redis:7.2.3-alpine
+    restart: always
 
-  # core:
-  #   image: wilt/scripty-core:0.0.1
-  #   ports:
-  #     - 42069:42069
+  bot:
+    image: wilt/scripty:0.0.8
+    ports:
+      - 42069:42069
+    depends_on:
+      - db
+      - stt
+      - cache
+    volumes:
+      - ./scripty-config:/config
+    environment:
+      - RUST_BACKTRACE=1
 
-  # monitor:
-  #   image: grafana/loki:v2.8.6
+  monitor:
+    image: grafana/loki:2.8.6
+    ports:
+      - 3100:3100
+      - 7946
+      - 9095
 
+  dashboard:
+    image: grafana/grafana-oss:10.2.2
+    restart: unless-stopped
+    ports:
+      - 3000:3000
