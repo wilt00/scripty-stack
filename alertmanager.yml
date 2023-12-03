@@ -1,0 +1,42 @@
+global:
+  resolve_timeout: 5m
+
+route:
+  group_by: ["alertname", "severity", "instance"]
+  group_wait: 45s
+  group_interval: 10m
+  repeat_interval: 1h
+  receiver: "default-catchall-discord"
+  routes:
+    - match:
+        severity: warning
+      receiver: warning-devops-discord
+      routes:
+        - match_re:
+            team: .*(devops).*
+          receiver: warning-devops-discord
+
+receivers:
+  - name: "default-catchall-discord"
+    discord_configs:
+      - send_resolved: true
+        webhook_url: "https://discord.com/api/webhooks/1180381650358636554/8u3NyRDu4dzi_1H_soFEAgEnYsCdPNhYdjnKADHILHfPpf3iqUw9J4ixtC9lP9BFSh5q"
+        title: '{{ if eq .Status "firing" }}:flushed:{{ else }}:sunglasses:{{ end }} [{{ .Status | toUpper }}] {{ .CommonAnnotations.summary }} (catchall)'
+        message: "{{ range .Alerts }}*Priority*: `{{ .Labels.severity | toUpper }}`\nInstance: {{ .Labels.instance }}\n{{ .Annotations.description }}\n{{ end }}"
+
+  - name: "warning-devops-discord"
+    discord_configs:
+      - send_resolved: true
+        webhook_url: "https://discord.com/api/webhooks/1180381650358636554/8u3NyRDu4dzi_1H_soFEAgEnYsCdPNhYdjnKADHILHfPpf3iqUw9J4ixtC9lP9BFSh5q"
+        title: '{{ if eq .Status "firing" }}:fire:{{ else }}:white_check_mark:{{ end }} [{{ .Status | toUpper }}] {{ .CommonAnnotations.title }} '
+        message: >-
+          {{ range .Alerts }}
+            *Description:* {{ .Annotations.description }}
+            *Severity:* `{{ .Labels.severity }}`
+            *Graph:* {{ if eq .Labels.category "logs" }}<{{ .Annotations.logurl }}|:chart_with_upwards_trend:>{{ else }}<{{ .GeneratorURL }}|:chart_with_upwards_trend:>{{ end }} *Dashboard:* <{{ .Annotations.dashboard }}|:bar_chart:> *Runbook:* <{{ .Annotations.runbook }}|:spiral_note_pad:>
+            *Details:*
+            {{ range .Labels.SortedPairs }} - *{{ .Name }}:* `{{ .Value }}`
+            {{ end }}
+             - *Impact*: {{ .Annotations.impact }}
+             - *Receiver*: warning-{{ .Labels.team }}-slack
+          {{ end }}

@@ -1,34 +1,67 @@
-version: '3.4'
+version: "3.4"
 
 services:
-
   db:
-    image: postgres:16.1
-    restart: always
+    image: postgres:16.1-alpine
+    restart: unless-stopped
     environment:
       POSTGRES_USER: scripty
       POSTGRES_PASSWORD: scripty
+    volumes:
+      - postgres:/var/lib/postgresql/data
+    healthcheck:
+      test: ["CMD-SHELL", "pg_isready", "-d", "scripty"]
+      interval: 30s
+      timeout: 60s
+      retries: 5
+      start_period: 80s
+
+  postgres_exporter:
+    image: quay.io/prometheuscommunity/postgres-exporter:v0.15.0
+    restart: unless-stopped
+    depends_on:
+      - db
+      - prometheus
+    environment:
+      - DATA_SOURCE_URI="db:5432"
+      - DATA_SOURCE_USER=scripty
+      - DATA_SOURCE_PASS=scripty
+      - PG_EXPORTER_AUTO_DISCOVER_DATABASES=true
 
   stt:
-    image: wilt/scripty-stt:0.1.0-cuda
+    image: wilt/scripty-stt:0.1.0.1-cuda
+    restart: unless-stopped
     environment:
       - MODEL_NAME=ggml-medium.en.bin
       - INSTANCE_COUNT=2
     deploy:
       resources:
         reservations:
-          devices:
-            - driver: nvidia
-              count: all
-              capabilities: [gpu]
-    volumes:
-      - D:\ai:/models
-    ports:
-      - 7269:7269
+          { devices: [{ driver: nvidia, count: all, capabilities: [gpu] }] }
+    volumes: ["D:\\ai:/models"]
+    ports: ["7269:7269"]
+    build: { dockerfile: ./scripty-stt-cuda.dockerfile }
+    # healthcheck:
+    #   test: ["CMD-SHELL", "echo -ne '\\x04\\x03' | nc -N localhost 7269"]
+    #   interval: 10s
+    #   timeout: 5s
+    #   retries: 5
 
-  cache:
+  # redis, temporary cache for the bot
+  redis:
     image: redis:7.2.3-alpine
-    restart: always
+    restart: unless-stopped
+
+  redis_exporter:
+    image: oliver006/redis_exporter:v1.55.0
+    restart: unless-stopped
+    depends_on:
+      - prometheus
+      - redis
+    ports:
+      - "9121:9121"
+    environment:
+      - REDIS_ADDR=redis://redis:6379
 
   bot:
     image: wilt/scripty:0.0.8
@@ -37,21 +70,79 @@ services:
     depends_on:
       - db
       - stt
-      - cache
+      - redis
+      - grafana
     volumes:
-      - ./scripty-config:/config
+      - ./scripty.config.toml:/config/config.toml
     environment:
       - RUST_BACKTRACE=1
+    build:
+      dockerfile: ./scripty.dockerfile
 
-  monitor:
-    image: grafana/loki:2.8.6
-    ports:
-      - 3100:3100
-      - 7946
-      - 9095
+  prometheus:
+    image: prom/prometheus:v2.48.0
+    restart: unless-stopped
+    volumes:
+      - ./prometheus.yml:/etc/prometheus/prometheus.yml
+      - prometheus:/prometheus
 
-  dashboard:
+  loki:
+    image: grafana/loki:2.9.2
+    command: "-config.file=/etc/loki/config.yaml -target=all"
+    restart: unless-stopped
+    volumes:
+      - ./loki-config.yaml:/etc/loki/config.yaml
+      - ./loki-rules.yml:/etc/loki/rules/fake/rules.yml
+      # - loki:/tmp/loki
+    healthcheck:
+      test:
+        [
+          "CMD-SHELL",
+          "wget --no-verbose --tries=1 --spider http://localhost:3100/ready || exit 1",
+        ]
+      interval: 10s
+      timeout: 5s
+      retries: 5
+    ports: ["3100:3100"]
+    depends_on:
+      - alertmanager
+
+  grafana:
     image: grafana/grafana-oss:10.2.2
     restart: unless-stopped
+    volumes:
+      - ./grafana-datasources.yaml:/etc/grafana/provisioning/datasources/ds.yaml
+      - grafana:/var/lib/grafana
+    healthcheck:
+      test:
+        [
+          "CMD-SHELL",
+          "wget --no-verbose --tries=1 --spider http://localhost:3000/api/health || exit 1",
+        ]
+      interval: 10s
+      timeout: 5s
+      retries: 5
+    ports: ["3000:3000"]
+    depends_on:
+      - loki
+      - prometheus
+
+  # https://github.com/ruanbekker/loki-alerts-docker/blob/main/docker-compose.yml
+  alertmanager:
+    image: prom/alertmanager:v0.26.0
+    command:
+      - "--config.file=/etc/alertmanager/config.yml"
+      - "--storage.path=/alertmanager"
+    restart: unless-stopped
+    volumes:
+      - ./alertmanager.yml:/etc/alertmanager/config.yml
     ports:
-      - 3000:3000
+      - "9093:9093"
+
+  # TODO: https://containrrr.dev/watchtower/
+
+volumes:
+  grafana: {}
+  loki: {}
+  prometheus: {}
+  postgres: {}

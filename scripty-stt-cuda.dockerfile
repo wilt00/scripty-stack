@@ -13,7 +13,7 @@ RUN cargo build --release --features cuda
 
 FROM nvidia/cuda:12.3.0-runtime-ubuntu22.04
 
-RUN DEBIAN_FRONTEND=noninteractive apt-get update && apt-get upgrade -y && rm -rf /var/lib/apt/lists/*
+RUN DEBIAN_FRONTEND=noninteractive apt-get update && apt-get upgrade -y && apt-get install -y netcat && rm -rf /var/lib/apt/lists/*
 
 COPY --from=build /stt-build/target/release /app
 
