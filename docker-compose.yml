@@ -92,7 +92,7 @@ services:
     restart: unless-stopped
     volumes:
       - ./loki-config.yaml:/etc/loki/config.yaml
-      - ./loki-rules.yml:/etc/loki/rules/fake/rules.yml
+      - ./loki-rules.yaml:/etc/loki/rules/fake/rules.yml
       # - loki:/tmp/loki
     healthcheck:
       test:
