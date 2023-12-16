@@ -1,3 +1,8 @@
+param (
+  [Parameter()] [switch] $All,
+  [Parameter()] [ValidateSet("scripty", "stt")] [string[]] $Build
+)
+
 if (-not $(Get-Module -ListAvailable -Name PSToml)) {
   Install-Module PSToml
 }
@@ -9,7 +14,8 @@ function Get-NextTag($svcName, $svcDir, $type) {
 
   if ($codeVersion -ne (($dockerVersion -Split '\.')[0..2] -join '.')) {
     $newVersion = "0"
-  } else {
+  }
+  else {
     $imgVersion = ($dockerVersion -Split '\.')[3]
     $newVersion = ($null -eq $imgVersion -or "" -eq $imgVersion) ? "0" : "$([int]$imgVersion + 1)"
   }
@@ -17,11 +23,15 @@ function Get-NextTag($svcName, $svcDir, $type) {
   return ($null -eq $type) ? "$codeVersion.$newVersion" : "$codeVersion.$newVersion-$type"
 }
 
-docker build -t wilt/scripty-stt:$(Get-NextTag scripty-stt stt-service cuda) -f .\scripty-stt-cuda.dockerfile .
+if ($All -or $Build -contains "stt") {
+  docker build -t wilt/scripty-stt:$(Get-NextTag scripty-stt stt-service cuda) -f .\scripty-stt-cuda.dockerfile .
+}
 
-# Assume we need to rerun sqlx
-docker run --name db-temp -p "5432:5432" -e POSTGRES_USER=scripty -e POSTGRES_PASSWORD=scripty -d --rm postgres
-docker build -t wilt/scripty:$(Get-NextTag scripty scripty) --network host -f .\scripty.dockerfile .
-docker stop db-temp
+if ($All -or $Build -contains "scripty") {
+  # Assume we need to rerun sqlx
+  docker run --name db-temp -p "5432:5432" -e POSTGRES_USER=scripty -e POSTGRES_PASSWORD=scripty -d --rm postgres
+  docker build -t wilt/scripty:$(Get-NextTag scripty scripty) --network host -f .\scripty.dockerfile .
+  docker stop db-temp
+}
 
 # docker compose up -d

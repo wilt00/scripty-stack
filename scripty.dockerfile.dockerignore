@@ -1,0 +1,13 @@
+.cargo
+.git
+.github
+.vscode
+scripty/target
+stt-service
+whisper-rs
+.gitignore
+.gitmodules
+*.yml
+*.yaml
+*.md
+*.ps1
