@@ -21,15 +21,15 @@ services:
     restart: unless-stopped
     depends_on:
       - db
-      - prometheus
     environment:
       - DATA_SOURCE_URI="db:5432"
       - DATA_SOURCE_USER=scripty
       - DATA_SOURCE_PASS=scripty
       - PG_EXPORTER_AUTO_DISCOVER_DATABASES=true
+    ports: ["9187:9187"]
 
   stt:
-    image: wilt/scripty-stt:0.1.0.0-cuda
+    image: wilt/scripty-stt:0.1.0.1-cuda
     restart: unless-stopped
     environment:
       - MODEL_NAME=ggml-medium.en.bin
@@ -42,14 +42,14 @@ services:
           { devices: [{ driver: nvidia, count: all, capabilities: [gpu] }] }
     volumes: ["D:\\ai:/models"]
     ports: ["7269:7269"]
-    build: { dockerfile: ./scripty-stt-cuda.dockerfile }
     # healthcheck:
     #   test: ["CMD-SHELL", "echo -ne '\\x04\\x03' | nc -N localhost 7269"]
     #   interval: 10s
     #   timeout: 5s
     #   retries: 5
+    depends_on:
+      - loki
 
-  # redis, temporary cache for the bot
   redis:
     image: redis:7.2.3-alpine
     restart: unless-stopped
@@ -58,7 +58,6 @@ services:
     image: oliver006/redis_exporter:v1.55.0
     restart: unless-stopped
     depends_on:
-      - prometheus
       - redis
     ports:
       - "9121:9121"
@@ -66,7 +65,7 @@ services:
       - REDIS_ADDR=redis://redis:6379
 
   bot:
-    image: wilt/scripty:1.0.0.0
+    image: wilt/scripty:1.0.0.3
     ports:
       - 42069:42069
     depends_on:
@@ -78,8 +77,6 @@ services:
       - ./scripty.config.toml:/config/config.toml
     environment:
       - RUST_BACKTRACE=1
-    build:
-      dockerfile: ./scripty.dockerfile
 
   prometheus:
     image: prom/prometheus:v2.48.0
@@ -87,6 +84,11 @@ services:
     volumes:
       - ./prometheus.yml:/etc/prometheus/prometheus.yml
       - prometheus:/prometheus
+    depends_on:
+      - postgres_exporter
+      - redis_exporter
+    ports:
+      - "9090:9090"
 
   loki:
     image: grafana/loki:2.9.2
