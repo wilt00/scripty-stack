@@ -1,4 +1,4 @@
-version: "3.4"
+version: "3.7"
 
 services:
   db:
@@ -83,6 +83,7 @@ services:
     restart: unless-stopped
     volumes:
       - ./prometheus.yml:/etc/prometheus/prometheus.yml
+      - ./prometheus-rules.yaml:/etc/prometheus/alert.rules
       - prometheus:/prometheus
     depends_on:
       - postgres_exporter
