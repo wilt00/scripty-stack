@@ -1,4 +1,4 @@
-FROM rust:1.74.0
+FROM rust:1.74.1
 
 RUN apt-get update && apt-get upgrade -y && apt-get install -y mold libclang1 cmake curl
 
@@ -9,7 +9,7 @@ COPY ./stt-service .
 RUN cargo build --release
 
 
-FROM alpine:3.18.5
+FROM alpine:3.19.0
 
 COPY --from=build /stt-build/target/release /app
 
