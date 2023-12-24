@@ -1,6 +1,7 @@
 FROM nvidia/cuda:12.3.1-devel-ubuntu22.04 as build-base
 
-RUN apt-get update && apt-get upgrade -y && apt-get install -y mold libclang1 cmake curl
+ENV DEBIAN_FRONTEND=noninteractive
+RUN apt-get update && apt-get upgrade -y && apt-get install -y mold libclang1 cmake curl && rm -rf /var/lib/apt/lists/*
 
 RUN curl --proto '=https' --tlsv1.2 -sSf https://sh.rustup.rs | sh -s -- -y --default-toolchain none
 ENV PATH="/root/.cargo/bin:${PATH}"

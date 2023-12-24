@@ -1,7 +1,7 @@
 version: "3.7"
 
 services:
-  db:
+  postgres:
     image: postgres:16.1-alpine
     restart: unless-stopped
     environment:
@@ -20,16 +20,16 @@ services:
     image: quay.io/prometheuscommunity/postgres-exporter:v0.15.0
     restart: unless-stopped
     depends_on:
-      - db
+      - postgres
     environment:
-      - DATA_SOURCE_URI="db:5432"
+      - DATA_SOURCE_URI="postgres:5432"
       - DATA_SOURCE_USER=scripty
       - DATA_SOURCE_PASS=scripty
       - PG_EXPORTER_AUTO_DISCOVER_DATABASES=true
     ports: ["9187:9187"]
 
   stt:
-    image: wilt/scripty-stt:0.1.0.1-cuda
+    image: wilt/scripty-stt:0.1.0.2-cuda
     restart: unless-stopped
     environment:
       - MODEL_NAME=ggml-medium.en.bin
@@ -65,18 +65,42 @@ services:
       - REDIS_ADDR=redis://redis:6379
 
   bot:
-    image: wilt/scripty:1.0.0.3
+    image: wilt/scripty:1.0.0.8
     ports:
       - 42069:42069
     depends_on:
-      - db
+      - postgres
       - stt
       - redis
       - grafana
+      - svix
     volumes:
       - ./scripty.config.toml:/config/config.toml
     environment:
       - RUST_BACKTRACE=1
+
+  svix:
+    image: svix/svix-server:v1.15.0
+    environment:
+      - SVIX_DB_DSN="postgres://scripty:scripty@postgres:5432/postgres"
+      - SVIX_REDIS_DSN="redis://redis:6379"
+      - RUST_BACKTRACE=1
+    ports:
+      - "8071:8071"
+    depends_on:
+      - postgres
+      - redis
+    entrypoint:
+      [
+        "/bin/sh",
+        "-c",
+        "export SVIX_MAIN_SECRET=$(cat /var/run/secrets/svix_main_secret) ; export SVIX_JWT_SECRET=$(cat /var/run/secrets/svix_jwt_secret) ; svix-server --run-migrations --wait-for 15",
+      ]
+    secrets:
+      - svix_main_secret
+      - svix_jwt_secret
+    volumes:
+      - ./svix.toml:/config.toml
 
   prometheus:
     image: prom/prometheus:v2.48.0
@@ -144,10 +168,41 @@ services:
     ports:
       - "9093:9093"
 
-  # TODO: https://containrrr.dev/watchtower/
+  # opentelemetry:
+  #   image: otel/opentelemetry-collector-contrib:0.91.0
+  #   volumes:
+  #     - ./otel-collector-config.yaml:/etc/otelcol-contrib/config.yaml
+  #   ports:
+  #     - "1888:1888" # pprof extension
+  #     - "8888:8888" # Prometheus metrics exposed by the Collector
+  #     - "8889:8889" # Prometheus exporter metrics
+  #     - "13133:13133" # health_check extension
+  #     - "4317:4317" # OTLP gRPC receiver
+  #     - "4318:4318" # OTLP http receiver
+  #     - "55679:55679" # zpages extension
+
+  # tempo:
+  #   image: grafana/tempo:2.3.1
+  #   command: ["-config.file=/etc/tempo.yaml"]
+  #   volumes:
+  #     - ../shared/tempo.yaml:/etc/tempo.yaml
+  #     - ./tempo-data:/tmp/tempo
+  #   ports:
+  #     - "14268:14268" # jaeger ingest
+  #     - "3200:3200" # tempo
+  #     - "9095:9095" # tempo grpc
+  #     - "4317:4317" # otlp grpc
+  #     - "4318:4318" # otlp http
+  #     - "9411:9411" # zipkin
 
 volumes:
   grafana: {}
   loki: {}
   prometheus: {}
   postgres: {}
+
+secrets:
+  svix_main_secret:
+    file: ./secrets/svix_main_secret.txt
+  svix_jwt_secret:
+    file: ./secrets/svix_jwt_secret.txt

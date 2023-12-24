@@ -2,6 +2,8 @@
 .git
 .github
 .vscode
+brevity
+poise
 scripty/target
 stt-service
 whisper-rs

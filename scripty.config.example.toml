@@ -6,7 +6,7 @@ redis_url = "redis://redis:6379"
 stt_services = ["stt:7269"]
 
 [database]
-host = ["db", 5432]
+host = ["postgres", 5432]
 user = "scripty"
 password = "scripty"
 database = "scripty"
